@@ -1,0 +1,13 @@
+{
+  "name": "ji-sketchbook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "check": "node verify-site.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  }
+}
