@@ -10,3 +10,5 @@
 - `dist/about.html`：旧自述地址跳回首页。
 
 运行 `npm run dev` 预览，`npm run check` 检查主题、项目和链接；`node verify-explore-render.mjs` 验证字符渲染。自动化检查不能替代真实浏览器的视觉与性能验收。
+
+推送到 `main` 后，GitHub Actions 会将 `dist/` 自动部署到 GitHub Pages；也可在 Actions 页面手动运行部署工作流。
