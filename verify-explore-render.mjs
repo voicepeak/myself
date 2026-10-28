@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {performance} from 'node:perf_hooks';
+import {createMaterialAtlas,renderSculptureScene} from './dist/field/volume-render.js';
+import {drawExplorationFrame,depthPhase} from './dist/explore-field.js';
+const require=createRequire(import.meta.url);let native;try{native=require('@napi-rs/canvas');}catch{native=require(process.env.TEMP+'/ji-site-qa/node_modules/@napi-rs/canvas');}
+const {createCanvas}=native,atlas=createMaterialAtlas(createCanvas),canvas=createCanvas(1440,900),reference=createCanvas(1440,900),ctx=canvas.getContext('2d'),ref=reference.getContext('2d'),pools=[[],[]];
+const state={count:3700,time:12,shape:0,nextShape:null,spread:0,morph:0,mix:1,static:true,pointer:{active:false,x:-10000,y:-10000},springs:[]};
+function frame(){return drawExplorationFrame(ctx,1440,900,state,atlas,pools).sort((a,b)=>a.i-b.i).map(p=>[p.x,p.y,p.alpha]);}
+for(const shape of [0,1,10,11,15,17,19,20,21,22,23]){state.shape=shape;state.spread=0;state.morph=0;state.from=null;state.springs=[];frame();renderSculptureScene(ref,1440,900,{count:3700,time:12,shape,morph:1,reveal:1,static:true,pointer:state.pointer},atlas,[]);assert.deepEqual(ctx.getImageData(0,0,1440,900).data,ref.getImageData(0,0,1440,900).data,'stable motif '+shape+' must match the lab renderer pixel for pixel');}
+for(const [shape,spread]of [[11,0],[1,.5],[20,1],[22,0],[10,.8],[0,0]]){const before=frame();state.from=state.last.slice();state.shape=shape;state.nextShape=null;state.morph=0;state.spread=spread;state.mix=0;const first=frame();assert.deepEqual(first,before,'interrupted theme switch starts at last displayed positions');state.from=null;state.mix=1;assert.ok(frame().every(p=>p.every(Number.isFinite)));}
+const phase0=depthPhase(.999999,2),phase1=depthPhase(1.000001,2);state.shape=0;state.nextShape=11;state.morph=phase0.forming;state.spread=phase0.scatter;const before=frame();state.shape=11;state.nextShape=20;state.morph=phase1.forming;state.spread=phase1.scatter;const after=frame();let largest=0;before.forEach((p,i)=>{largest=Math.max(largest,Math.hypot(p[0]-after[i][0],p[1]-after[i][1]));assert.ok(Math.abs(p[2]-after[i][2])<.0001);});assert.ok(largest<.03,`continuous at depth boundary: ${largest}px`);
+function at(progress){const q=depthPhase(progress,2),shapes=[0,11,20];state.shape=shapes[q.index];state.nextShape=shapes[q.index+1]??null;state.morph=q.forming;state.spread=q.scatter;state.from=null;state.mix=1;return frame();}
+for(const p of [.15,.5,.89,1.05,1.55,1.91,2.55]){const forward=at(p);at(Math.min(2.62,p+.3));assert.deepEqual(at(p),forward,'reverse scrolling returns to the same point positions');}
+state.shape=11;state.nextShape=null;state.morph=0;state.spread=1;const hold=frame();assert.ok(hold.filter(p=>p[0]>1440*.2&&p[0]<1440*.8&&p[1]>900*.22&&p[1]<900*.78).length<3700*.035,'space is clear for content');
+const timings=[];for(const shape of [0,1,11,20,22]){state.shape=shape;state.spread=0;frame();const start=performance.now();for(let i=0;i<4;i++)frame();timings.push({shape,ms:Math.round((performance.now()-start)/4*10)/10});}
+state.shape=11;state.nextShape=22;state.morph=.5;state.spread=.5;frame();const transitionStart=performance.now();for(let i=0;i<4;i++)frame();timings.push({shape:'11→22',ms:Math.round((performance.now()-transitionStart)/4*10)/10});
+console.log('PASS: every stable character motif matches the lab renderer pixel for pixel; transitions preserve displayed positions and remain continuous across depth boundaries. Native canvas timings (not browser FPS):',JSON.stringify(timings));
